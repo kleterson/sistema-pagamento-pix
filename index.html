@@ -123,7 +123,22 @@
       text-align: center;
     }
 
-    /* CARD DE SUCESSO DO PAGAMENTO */
+    /* ALERTA DE CÓDIGO COPIADO */
+    .copiado-aviso {
+      display: none;
+      background-color: #e3f2fd;
+      color: #0d47a1;
+      border: 1px solid #bbdefb;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-weight: bold;
+      margin-top: 8px;
+      text-align: center;
+      animation: fadeIn 0.3s;
+    }
+
+    /* CARD DE SUCESSO DO PAGAMENTO APROVADO */
     .sucesso-box {
       background-color: #e8f5e9;
       border: 2px solid #2e7d32;
@@ -156,12 +171,18 @@
       0% { transform: scale(0.7); opacity: 0; }
       100% { transform: scale(1); opacity: 1; }
     }
+
+    @keyframes fadeIn {
+      0% { opacity: 0; }
+      100% { opacity: 1; }
+    }
   </style>
 </head>
 <body>
 
-  <!-- Elemento de áudio com efeito de sucesso -->
+  <!-- Sons de Notificação -->
   <audio id="somSucesso" src="https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3" preload="auto"></audio>
+  <audio id="somCopia" src="https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3" preload="auto"></audio>
 
   <div class="container">
     <h2>Escolha a forma de pagamento</h2>
@@ -234,28 +255,31 @@
   </div>
 
   <script>
-    // Conexão Socket.io com o Render
     const socket = io("https://sistema-pagamento-pix.onrender.com");
 
-    // RECEBE A NOTIFICAÇÃO DE PAGAMENTO APROVADO
+    // RECEBE A NOTIFICAÇÃO DE PAGAMENTO APROVADO (PIX OU CARTÃO VIA SERVER)
     socket.on('pagamento_confirmado', (data) => {
-      // 1. Toca o som de sucesso
+      exibirTelaSucesso(data.valor);
+    });
+
+    function exibirTelaSucesso(valor) {
+      // Toca o som de pagamento aprovado
       const audio = document.getElementById('somSucesso');
       if (audio) {
         audio.currentTime = 0;
-        audio.play().catch(e => console.log("Aviso: o som precisa de interacao previa:", e));
+        audio.play().catch(e => console.log(e));
       }
 
-      // 2. Substitui o QR Code pela tela de sucesso bonita
+      // Exibe o card de confirmação verde
       const divResultado = document.getElementById('resultadoPix');
       divResultado.innerHTML = `
         <div class="sucesso-box">
           <div class="sucesso-icone">✔</div>
           <div class="sucesso-titulo">Pagamento Confirmado!</div>
-          <div class="sucesso-texto">Recebemos seu Pix de <strong>R$ ${data.valor}</strong> com sucesso.</div>
+          <div class="sucesso-texto">Recebemos o seu pagamento de <strong>R$ ${valor}</strong> com sucesso.</div>
         </div>
       `;
-    });
+    }
 
     function mostrarAba(aba) {
       const btnPix = document.querySelectorAll('.tab-btn')[0];
@@ -278,9 +302,9 @@
 
     // --- LÓGICA DO PIX ---
     async function gerarPixFixo() {
-      // Toca/desbloqueia o som no clique do botão para permitir autoplay nos navegadores
-      const audio = document.getElementById('somSucesso');
-      if (audio) { audio.load(); }
+      // Pré-carrega os áudios
+      document.getElementById('somSucesso').load();
+      document.getElementById('somCopia').load();
 
       const divResultado = document.getElementById('resultadoPix');
       divResultado.innerHTML = '<p style="text-align: center; color: #666;">Gerando QR Code...</p>';
@@ -308,6 +332,7 @@
             <img src="data:image/jpeg;base64,${data.qrCodeBase64}" alt="QR Code Pix" style="width: 200px; height: 200px; margin-bottom: 15px;">
             <div class="copia-cola-box">${data.copiaECola}</div>
             <button class="btn-submit" style="background:#28a745;" onclick="copiarPix('${data.copiaECola}')">📋 Copiar Código Pix</button>
+            <div id="avisoCopiado" class="copiado-aviso">📋 Código Pix copiado! Abra o app do seu banco e cole para pagar.</div>
             <p style="margin-top: 15px; font-size: 13px; color: #666; text-align: center;">Aguardando confirmação do pagamento...</p>
           `;
         } else {
@@ -319,9 +344,22 @@
       }
     }
 
+    // FUNÇÃO AO CLICAR EM COPIAR PIX
     function copiarPix(codigo) {
       navigator.clipboard.writeText(codigo);
-      alert('Código Pix copiado para a área de transferência!');
+
+      // Toca o som suave de cópia
+      const audioCopia = document.getElementById('somCopia');
+      if (audioCopia) {
+        audioCopia.currentTime = 0;
+        audioCopia.play().catch(e => console.log(e));
+      }
+
+      // Mostra a mensagem de "Código Copiado!"
+      const aviso = document.getElementById('avisoCopiado');
+      if (aviso) {
+        aviso.style.display = 'block';
+      }
     }
   </script>
 </body>
