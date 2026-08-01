@@ -7,7 +7,7 @@
   <!-- Mercado Pago SDK v2 -->
   <script src="https://sdk.mercadopago.com/js/v2"></script>
   <!-- Socket.io Client -->
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://sistema-pagamento-pix.onrender.com/socket.io/socket.io.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -111,12 +111,6 @@
       margin-top: 20px;
     }
 
-    .qr-container img {
-      width: 200px;
-      height: 200px;
-      margin-bottom: 15px;
-    }
-
     .copia-cola-box {
       width: 100%;
       padding: 10px;
@@ -129,29 +123,45 @@
       text-align: center;
     }
 
-    .notificacao {
-      margin-top: 20px;
-      padding: 15px;
-      border-radius: 6px;
+    /* CARD DE SUCESSO DO PAGAMENTO */
+    .sucesso-box {
+      background-color: #e8f5e9;
+      border: 2px solid #2e7d32;
+      border-radius: 10px;
+      padding: 25px 15px;
       text-align: center;
+      margin-top: 20px;
+      animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .sucesso-icone {
+      font-size: 50px;
+      color: #2e7d32;
+      margin-bottom: 10px;
+    }
+
+    .sucesso-titulo {
+      color: #1b5e20;
+      font-size: 20px;
       font-weight: bold;
-      display: none;
+      margin-bottom: 8px;
     }
 
-    .notificacao.sucesso {
-      background-color: #d4edda;
-      color: #155724;
-      border: 1px solid #c3e6cb;
+    .sucesso-texto {
+      color: #388e3c;
+      font-size: 15px;
     }
 
-    .notificacao.erro {
-      background-color: #f8d7da;
-      color: #721c24;
-      border: 1px solid #f5c6cb;
+    @keyframes popIn {
+      0% { transform: scale(0.7); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
     }
   </style>
 </head>
 <body>
+
+  <!-- Elemento de áudio com efeito de sucesso -->
+  <audio id="somSucesso" src="https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3" preload="auto"></audio>
 
   <div class="container">
     <h2>Escolha a forma de pagamento</h2>
@@ -165,7 +175,7 @@
     <div id="abaPix">
       <div class="form-group">
         <label for="valorPix">Valor (R$):</label>
-        <input type="number" id="valorPix" value="10.00" step="0.01" min="1">
+        <input type="text" id="valorPix" value="10,00">
       </div>
       <button class="btn-submit" onclick="gerarPixFixo()">Gerar QR Code Pix</button>
 
@@ -220,16 +230,31 @@
       </form>
     </div>
 
-    <div id="notificacao" class="notificacao"></div>
+    <div id="notificacao"></div>
   </div>
 
   <script>
-    // Conexão via WebSocket (funciona automaticamente local ou na nuvem)
-    const socket = io();
+    // Conexão Socket.io com o Render
+    const socket = io("https://sistema-pagamento-pix.onrender.com");
 
+    // RECEBE A NOTIFICAÇÃO DE PAGAMENTO APROVADO
     socket.on('pagamento_confirmado', (data) => {
-      exibirNotificacao(`🎉 Pagamento de R$ ${data.valor} APROVADO com sucesso!`, 'sucesso');
-      document.getElementById('resultadoPix').innerHTML = '';
+      // 1. Toca o som de sucesso
+      const audio = document.getElementById('somSucesso');
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play().catch(e => console.log("Aviso: o som precisa de interacao previa:", e));
+      }
+
+      // 2. Substitui o QR Code pela tela de sucesso bonita
+      const divResultado = document.getElementById('resultadoPix');
+      divResultado.innerHTML = `
+        <div class="sucesso-box">
+          <div class="sucesso-icone">✔</div>
+          <div class="sucesso-titulo">Pagamento Confirmado!</div>
+          <div class="sucesso-texto">Recebemos seu Pix de <strong>R$ ${data.valor}</strong> com sucesso.</div>
+        </div>
+      `;
     });
 
     function mostrarAba(aba) {
@@ -253,30 +278,43 @@
 
     // --- LÓGICA DO PIX ---
     async function gerarPixFixo() {
+      // Toca/desbloqueia o som no clique do botão para permitir autoplay nos navegadores
+      const audio = document.getElementById('somSucesso');
+      if (audio) { audio.load(); }
+
       const divResultado = document.getElementById('resultadoPix');
       divResultado.innerHTML = '<p style="text-align: center; color: #666;">Gerando QR Code...</p>';
-      ocultarNotificacao();
 
       try {
-        const valor = document.getElementById('valorPix').value;
-        const res = await fetch('/api/pix/valor-fixo', {
+        let valorInput = document.getElementById('valorPix').value;
+        valorInput = valorInput.replace(',', '.');
+        const valorNum = parseFloat(valorInput);
+
+        if (isNaN(valorNum) || valorNum <= 0) {
+          divResultado.innerHTML = `<p style="color:red;">Por favor, digite um valor válido.</p>`;
+          return;
+        }
+
+        const res = await fetch('https://sistema-pagamento-pix.onrender.com/api/pix/valor-fixo', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ valor: valor })
+          body: JSON.stringify({ valor: valorNum })
         });
 
         const data = await res.json();
 
         if (data.success) {
           divResultado.innerHTML = `
-            <img src="data:image/jpeg;base64,${data.qrCodeBase64}" alt="QR Code Pix">
+            <img src="data:image/jpeg;base64,${data.qrCodeBase64}" alt="QR Code Pix" style="width: 200px; height: 200px; margin-bottom: 15px;">
             <div class="copia-cola-box">${data.copiaECola}</div>
             <button class="btn-submit" style="background:#28a745;" onclick="copiarPix('${data.copiaECola}')">📋 Copiar Código Pix</button>
+            <p style="margin-top: 15px; font-size: 13px; color: #666; text-align: center;">Aguardando confirmação do pagamento...</p>
           `;
         } else {
-          divResultado.innerHTML = `<p style="color:red;">Erro: ${data.error}</p>`;
+          divResultado.innerHTML = `<p style="color:red;">Erro Mercado Pago: ${data.error}</p>`;
         }
       } catch (err) {
+        console.error(err);
         divResultado.innerHTML = `<p style="color:red;">Erro ao se conectar ao servidor.</p>`;
       }
     }
@@ -284,17 +322,6 @@
     function copiarPix(codigo) {
       navigator.clipboard.writeText(codigo);
       alert('Código Pix copiado para a área de transferência!');
-    }
-
-    function exibirNotificacao(mensagem, tipo) {
-      const notif = document.getElementById('notificacao');
-      notif.innerText = mensagem;
-      notif.className = `notificacao ${tipo}`;
-      notif.style.display = 'block';
-    }
-
-    function ocultarNotificacao() {
-      document.getElementById('notificacao').style.display = 'none';
     }
   </script>
 </body>
