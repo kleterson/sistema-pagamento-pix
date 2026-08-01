@@ -1,16 +1,29 @@
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
 const { MercadoPagoConfig, Payment } = require('mercadopago');
 const sqlite3 = require('sqlite3').verbose();
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+const io = new Server(server, { 
+  cors: { 
+    origin: "*",
+    methods: ["GET", "POST"]
+  } 
+});
 
 app.use(express.json());
 app.use(cors());
+
+// --- SERVIR ARQUIVOS ESTÁTICOS (HTML, CSS, JS) ---
+app.use(express.static(path.join(__dirname)));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // --- BANCO DE DADOS (SQLite) ---
 const db = new sqlite3.Database('./vendas.db', (err) => {
@@ -29,9 +42,9 @@ db.run(`
 `);
 
 // --- MERCADO PAGO ---
-const client = new MercadoPagoConfig({ 
-  accessToken: 'APP_USR-517824253559090-073117-47dad5ef4352fb0abd9e5d717275dfa3-71867761' // <-- Lembre-se de manter seu Token aqui!
-});
+// Pega a variável de ambiente do Render ou usa o token diretamente
+const accessToken = process.env.MERCADO_PAGO_TOKEN || 'APP_USR-517824253559090-073117-47dad5ef4352fb0abd9e5d717275dfa3-71867761';
+const client = new MercadoPagoConfig({ accessToken });
 const payment = new Payment(client);
 
 // WebSocket
@@ -66,7 +79,7 @@ app.post('/api/pix/valor-fixo', async (req, res) => {
   }
 });
 
-// 2. NOVA ROTA: CARTÃO DE CRÉDITO/DÉBITO
+// 2. ROTA: CARTÃO DE CRÉDITO/DÉBITO
 app.post('/api/cartao/pagar', async (req, res) => {
   try {
     const { token, issuer_id, payment_method_id, transaction_amount, installments, email, cpf } = req.body;
@@ -105,7 +118,7 @@ app.post('/api/cartao/pagar', async (req, res) => {
   }
 });
 
-// 3. WEBHOOK
+// 3. WEBHOOK (REPETIÇÃO E NOTIFICAÇÃO DO MERCADO PAGO)
 app.post('/webhook', async (req, res) => {
   const { type, data } = req.body;
   if (type === 'payment') {
@@ -138,5 +151,5 @@ app.get('/api/pix/valor-livre', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });
