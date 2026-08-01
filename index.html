@@ -17,7 +17,6 @@
     }
 
     body {
-      /* Fundo com Imagem de Tecnologia e Overlay Escuro para dar Contraste */
       background: linear-gradient(rgba(10, 20, 30, 0.75), rgba(10, 20, 30, 0.85)), 
                   url('https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1920&q=80') no-repeat center center fixed;
       background-size: cover;
@@ -85,10 +84,19 @@
       border-radius: 6px;
       font-size: 15px;
       outline: none;
+      background-color: #fff;
     }
 
     input:focus, select:focus {
       border-color: #009ee3;
+    }
+
+    .mp-input-box {
+      height: 45px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 8px 12px;
+      background-color: #fff;
     }
 
     .btn-submit {
@@ -127,7 +135,6 @@
       text-align: center;
     }
 
-    /* ALERTA DE CÓDIGO COPIADO */
     .copiado-aviso {
       display: none;
       background-color: #e3f2fd;
@@ -142,7 +149,6 @@
       animation: fadeIn 0.3s;
     }
 
-    /* CARD DE SUCESSO DO PAGAMENTO APROVADO */
     .sucesso-box {
       background-color: #e8f5e9;
       border: 2px solid #2e7d32;
@@ -184,7 +190,7 @@
 </head>
 <body>
 
-  <!-- Sons de Notificação -->
+  <!-- Sons -->
   <audio id="somSucesso" src="https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3" preload="auto"></audio>
   <audio id="somCopia" src="https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3" preload="auto"></audio>
 
@@ -212,23 +218,23 @@
       <form id="formCartao">
         <div class="form-group">
           <label>Número do Cartão:</label>
-          <div id="formCartao-cardNumber" style="height: 45px; border: 1px solid #ccc; border-radius: 6px; padding: 5px; background: white;"></div>
+          <div id="formCartao-cardNumber" class="mp-input-box"></div>
         </div>
 
         <div class="form-group" style="display: flex; gap: 10px;">
           <div style="flex: 1;">
             <label>Validade:</label>
-            <div id="formCartao-expirationDate" style="height: 45px; border: 1px solid #ccc; border-radius: 6px; padding: 5px; background: white;"></div>
+            <div id="formCartao-expirationDate" class="mp-input-box"></div>
           </div>
           <div style="flex: 1;">
             <label>CVV:</label>
-            <div id="formCartao-securityCode" style="height: 45px; border: 1px solid #ccc; border-radius: 6px; padding: 5px; background: white;"></div>
+            <div id="formCartao-securityCode" class="mp-input-box"></div>
           </div>
         </div>
 
         <div class="form-group">
           <label for="cardholderName">Nome no Cartão:</label>
-          <input type="text" id="cardholderName" placeholder="Como está no cartão">
+          <input type="text" id="cardholderName" placeholder="Como está impresso no cartão">
         </div>
 
         <div class="form-group">
@@ -255,26 +261,26 @@
       </form>
     </div>
 
-    <div id="notificacao"></div>
+    <div id="resultadoCartao" style="margin-top: 15px;"></div>
   </div>
 
   <script>
     const socket = io("https://sistema-pagamento-pix.onrender.com");
+    let mpInstance = null;
+    let cardFormInstance = null;
 
-    // RECEBE A NOTIFICAÇÃO DE PAGAMENTO APROVADO
+    // Recebe notificação de pagamento aprovado via Socket
     socket.on('pagamento_confirmado', (data) => {
       exibirTelaSucesso(data.valor);
     });
 
     function exibirTelaSucesso(valor) {
-      // Toca o som de pagamento aprovado
       const audio = document.getElementById('somSucesso');
       if (audio) {
         audio.currentTime = 0;
         audio.play().catch(e => console.log(e));
       }
 
-      // Exibe o card de confirmação verde
       const divResultado = document.getElementById('resultadoPix');
       divResultado.innerHTML = `
         <div class="sucesso-box">
@@ -301,12 +307,87 @@
         btnPix.classList.remove('active');
         abaCartao.style.display = 'block';
         abaPix.style.display = 'none';
+
+        // Inicializa os campos do Cartão do Mercado Pago
+        inicializarCartaoMercadoPago();
+      }
+    }
+
+    // Inicializador seguro do Cartão
+    async function inicializarCartaoMercadoPago() {
+      if (cardFormInstance) return; // Evita recarregar se já inicializou
+
+      try {
+        // Toca em seu backend para pegar a chave pública se necessário ou usa SDK v2
+        const mp = new MercadoPago('APP_USR-70133504-c8c3-4d26-a05d-c6a655dd0e6f', { locale: 'pt-BR' });
+        
+        cardFormInstance = mp.cardForm({
+          amount: "10.00",
+          iframe: true,
+          form: {
+            id: "formCartao",
+            cardNumber: { id: "formCartao-cardNumber", placeholder: "0000 0000 0000 0000" },
+            expirationDate: { id: "formCartao-expirationDate", placeholder: "MM/AA" },
+            securityCode: { id: "formCartao-securityCode", placeholder: "123" },
+            cardholderName: { id: "cardholderName" },
+            issuer: { id: "issuer" },
+            installments: { id: "installments" },
+            identificationNumber: { id: "docNumber" },
+            cardholderEmail: { id: "email" }
+          },
+          callbacks: {
+            onFormMounted: error => {
+              if (error) return console.warn("Erro ao carregar campos de cartão:", error);
+            },
+            onSubmit: event => {
+              event.preventDefault();
+              const {
+                paymentMethodId: payment_method_id,
+                issuerId: issuer_id,
+                cardholderEmail: email,
+                token,
+                installments,
+                identificationNumber: docNumber
+              } = cardFormInstance.getCardFormData();
+
+              document.getElementById('btnPagarCartao').innerText = "Processando...";
+
+              fetch("https://sistema-pagamento-pix.onrender.com/api/cartao/pagar", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  token,
+                  issuer_id,
+                  payment_method_id,
+                  transaction_amount: 10.00,
+                  installments: Number(installments),
+                  email,
+                  cpf: docNumber
+                })
+              })
+              .then(res => res.json())
+              .then(data => {
+                document.getElementById('btnPagarCartao').innerText = "Pagar com Cartão";
+                if(data.success) {
+                  exibirTelaSucesso("10.00");
+                } else {
+                  alert("Erro no pagamento: " + (data.error || "Dados recusados."));
+                }
+              })
+              .catch(err => {
+                document.getElementById('btnPagarCartao').innerText = "Pagar com Cartão";
+                alert("Erro ao conectar com o servidor.");
+              });
+            }
+          }
+        });
+      } catch (err) {
+        console.error("Erro no SDK Mercado Pago:", err);
       }
     }
 
     // --- LÓGICA DO PIX ---
     async function gerarPixFixo() {
-      // Pré-carrega os áudios
       document.getElementById('somSucesso').load();
       document.getElementById('somCopia').load();
 
@@ -348,18 +429,15 @@
       }
     }
 
-    // FUNÇÃO AO CLICAR EM COPIAR PIX
     function copiarPix(codigo) {
       navigator.clipboard.writeText(codigo);
 
-      // Toca o som suave de cópia
       const audioCopia = document.getElementById('somCopia');
       if (audioCopia) {
         audioCopia.currentTime = 0;
         audioCopia.play().catch(e => console.log(e));
       }
 
-      // Mostra a mensagem de "Código Copiado!"
       const aviso = document.getElementById('avisoCopiado');
       if (aviso) {
         aviso.style.display = 'block';
