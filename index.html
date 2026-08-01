@@ -2,301 +2,300 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Checkout de Pagamento</title>
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-  <!-- SDK do Mercado Pago -->
+  <!-- Mercado Pago SDK v2 -->
   <script src="https://sdk.mercadopago.com/js/v2"></script>
+  <!-- Socket.io Client -->
+  <script src="/socket.io/socket.io.js"></script>
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 20px; display: flex; justify-content: center; }
-    .container { background: white; padding: 25px; border-radius: 12px; width: 100%; max-width: 450px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-    
-    /* Abas de Escolha */
-    .abas { display: flex; gap: 10px; margin-bottom: 20px; }
-    .aba-btn { flex: 1; padding: 10px; border: 1px solid #009ee3; background: white; color: #009ee3; font-weight: bold; border-radius: 6px; cursor: pointer; }
-    .aba-btn.ativo { background: #009ee3; color: white; }
-    
-    .secao { display: none; }
-    .secao.ativa { display: block; }
-
-    input, select, button, textarea { width: 100%; padding: 10px; margin-top: 8px; box-sizing: border-box; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
-    button { background: #009ee3; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 15px; }
-    button:hover { background: #0081b8; }
-    .btn-copiar { background: #28a745; margin-top: 8px; }
-    .btn-copiar:hover { background: #218838; }
-
-    #notificacao { 
-      display: none; 
-      background: #28a745; 
-      color: white; 
-      padding: 15px; 
-      border-radius: 8px; 
-      text-align: center; 
-      font-size: 18px; 
-      font-weight: bold; 
-      margin-bottom: 20px; 
-      box-shadow: 0 4px 10px rgba(40, 167, 69, 0.3);
-      animation: pop 0.4s ease-out;
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
 
-    .timer { text-align: center; font-weight: bold; color: #d9534f; margin-top: 10px; font-size: 13px; }
-    img { display: block; margin: 15px auto; max-width: 180px; border: 1px solid #ddd; border-radius: 8px; padding: 5px; }
-    textarea { height: 60px; resize: none; font-size: 11px; }
+    body {
+      background-color: #f4f6f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
 
-    @keyframes pop {
-      0% { transform: scale(0.8); opacity: 0; }
-      100% { transform: scale(1); opacity: 1; }
+    .container {
+      background-color: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      width: 100%;
+      max-width: 480px;
+      padding: 30px;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 25px;
+      color: #333;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 25px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid #009ee3;
+      background-color: #fff;
+      color: #009ee3;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .tab-btn.active {
+      background-color: #009ee3;
+      color: #fff;
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      color: #555;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 15px;
+      outline: none;
+    }
+
+    input:focus, select:focus {
+      border-color: #009ee3;
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 14px;
+      background-color: #009ee3;
+      border: none;
+      color: white;
+      font-weight: bold;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .btn-submit:hover {
+      background-color: #0081b8;
+    }
+
+    .qr-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 20px;
+    }
+
+    .qr-container img {
+      width: 200px;
+      height: 200px;
+      margin-bottom: 15px;
+    }
+
+    .copia-cola-box {
+      width: 100%;
+      padding: 10px;
+      background: #f0f0f0;
+      border: 1px dashed #bbb;
+      border-radius: 6px;
+      word-break: break-all;
+      font-size: 13px;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    .notificacao {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 6px;
+      text-align: center;
+      font-weight: bold;
+      display: none;
+    }
+
+    .notificacao.sucesso {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .notificacao.erro {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
     }
   </style>
 </head>
 <body>
 
   <div class="container">
-    <!-- Banner de Notificação Superior -->
-    <div id="notificacao">🎉 Pagamento Confirmado com Sucesso!</div>
-
     <h2>Escolha a forma de pagamento</h2>
 
-    <div class="abas">
-      <button class="aba-btn ativo" onclick="trocarAba('pix')">⚡ Pix</button>
-      <button class="aba-btn" onclick="trocarAba('cartao')">💳 Cartão</button>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="mostrarAba('pix')">⚡ Pix</button>
+      <button class="tab-btn" onclick="mostrarAba('cartao')">💳 Cartão</button>
     </div>
 
-    <!-- SEÇÃO PIX -->
-    <div id="secaoPix" class="secao ativa">
-      <label>Valor (R$):</label>
-      <input type="number" id="valorPix" value="10.00" step="0.01">
-      <button type="button" onclick="gerarPixFixo()">Gerar QR Code Pix</button>
-      <div id="resultadoPix"></div>
+    <!-- ABA PIX -->
+    <div id="abaPix">
+      <div class="form-group">
+        <label for="valorPix">Valor (R$):</label>
+        <input type="number" id="valorPix" value="10.00" step="0.01" min="1">
+      </div>
+      <button class="btn-submit" onclick="gerarPixFixo()">Gerar QR Code Pix</button>
+
+      <div id="resultadoPix" class="qr-container"></div>
     </div>
 
-    <!-- SEÇÃO CARTÃO -->
-    <div id="secaoCartao" class="secao">
+    <!-- ABA CARTÃO -->
+    <div id="abaCartao" style="display: none;">
       <form id="formCartao">
-        <label>Valor (R$):</label>
-        <input type="number" id="valorCartao" value="10.00" step="0.01">
+        <div class="form-group">
+          <label>Número do Cartão:</label>
+          <div id="formCartao-cardNumber" style="height: 45px; border: 1px solid #ccc; border-radius: 6px; padding: 5px;"></div>
+        </div>
 
-        <label>Número do Cartão:</label>
-        <input type="text" id="cardNumber" placeholder="0000 0000 0000 0000" required>
-
-        <div style="display: flex; gap: 10px;">
-          <div>
+        <div class="form-group" style="display: flex; gap: 10px;">
+          <div style="flex: 1;">
             <label>Validade:</label>
-            <input type="text" id="cardExpirationDate" placeholder="MM/YY" required>
+            <div id="formCartao-expirationDate" style="height: 45px; border: 1px solid #ccc; border-radius: 6px; padding: 5px;"></div>
           </div>
-          <div>
+          <div style="flex: 1;">
             <label>CVV:</label>
-            <input type="text" id="securityCode" placeholder="123" required>
+            <div id="formCartao-securityCode" style="height: 45px; border: 1px solid #ccc; border-radius: 6px; padding: 5px;"></div>
           </div>
         </div>
 
-        <label>Nome do Titular:</label>
-        <input type="text" id="cardholderName" placeholder="Como no cartão" required>
+        <div class="form-group">
+          <label for="cardholderName">Nome no Cartão:</label>
+          <input type="text" id="cardholderName" placeholder="Como está no cartão">
+        </div>
 
-        <label>CPF do Titular:</label>
-        <input type="text" id="docNumber" placeholder="000.000.000-00" required>
+        <div class="form-group">
+          <label for="email">E-mail:</label>
+          <input type="email" id="email" placeholder="seu@email.com">
+        </div>
 
-        <label>E-mail do Comprador:</label>
-        <input type="email" id="email" placeholder="cliente@email.com" required>
+        <div class="form-group">
+          <label for="docNumber">CPF:</label>
+          <input type="text" id="docNumber" placeholder="Somente números">
+        </div>
 
-        <button type="submit" id="btnPagarCartao">Pagar com Cartão</button>
+        <div class="form-group">
+          <label for="installments">Parcelas:</label>
+          <select id="installments"></select>
+        </div>
+
+        <div class="form-group">
+          <label for="issuer">Banco Emissor:</label>
+          <select id="issuer"></select>
+        </div>
+
+        <button type="submit" class="btn-submit" id="btnPagarCartao">Pagar com Cartão</button>
       </form>
-      <div id="resultadoCartao"></div>
     </div>
+
+    <div id="notificacao" class="notificacao"></div>
   </div>
 
   <script>
-    const socket = io('http://localhost:3000');
-    // LEMBRE-SE DE COLOCAR SUA PUBLIC KEY DO MERCADO PAGO AQUI!
-    const mp = new MercadoPago('APP_USR-b4730bb9-f8ee-4670-b4db-c3a2f6cc9ad4');
-    let intervaloTimer = null;
+    // Conexão via WebSocket (funciona automaticamente local ou na nuvem)
+    const socket = io();
 
-    // Função de Efeito Sonoro de Sucesso
-    function tocarSomSucesso() {
-      try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
-        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); 
-        osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); 
-        osc.frequency.setValueAtTime(1046.50, audioCtx.currentTime + 0.3); 
-        
-        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8);
-        
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.8);
-      } catch(e) { console.log('Áudio não permitido ainda pelo navegador.'); }
-    }
+    socket.on('pagamento_confirmado', (data) => {
+      exibirNotificacao(`🎉 Pagamento de R$ ${data.valor} APROVADO com sucesso!`, 'sucesso');
+      document.getElementById('resultadoPix').innerHTML = '';
+    });
 
-    function trocarAba(aba) {
-      document.querySelectorAll('.aba-btn').forEach(b => b.classList.remove('ativo'));
-      document.querySelectorAll('.secao').forEach(s => s.classList.remove('ativa'));
+    function mostrarAba(aba) {
+      const btnPix = document.querySelectorAll('.tab-btn')[0];
+      const btnCartao = document.querySelectorAll('.tab-btn')[1];
+      const abaPix = document.getElementById('abaPix');
+      const abaCartao = document.getElementById('abaCartao');
 
       if (aba === 'pix') {
-        document.querySelectorAll('.aba-btn')[0].classList.add('ativo');
-        document.getElementById('secaoPix').classList.add('ativa');
+        btnPix.classList.add('active');
+        btnCartao.classList.remove('active');
+        abaPix.style.display = 'block';
+        abaCartao.style.display = 'none';
       } else {
-        document.querySelectorAll('.aba-btn')[1].classList.add('ativo');
-        document.getElementById('secaoCartao').classList.add('ativa');
+        btnCartao.classList.add('active');
+        btnPix.classList.remove('active');
+        abaCartao.style.display = 'block';
+        abaPix.style.display = 'none';
       }
     }
 
-    // Ouve confirmação em tempo real (Webhook -> Socket)
-    socket.on('pagamento_confirmado', (dados) => {
-      if (intervaloTimer) clearInterval(intervaloTimer);
-
-      // 1. Toca o Som
-      tocarSomSucesso();
-
-      // 2. Banner de Sucesso Superior
-      const notif = document.getElementById('notificacao');
-      notif.innerHTML = `🎉 Pagamento de R$ ${dados.valor} CONFIRMADO!`;
-      notif.style.display = 'block';
-
-      // 3. Substitui o QR Code por Mensagem de Sucesso
-      document.getElementById('resultadoPix').innerHTML = `
-        <div style="text-align: center; color: #28a745; margin-top: 15px;">
-          <h2>✅ Pix Efetuado com Sucesso!</h2>
-          <p>Obrigado pelo seu pagamento.</p>
-        </div>
-      `;
-    });
-
-    // Função de Copiar Código Pix com feedback no botão
-    function copiarCodigoPix(btn) {
-      const textarea = document.getElementById('pixCopiaCola');
-      textarea.select();
-      textarea.setSelectionRange(0, 99999);
-      navigator.clipboard.writeText(textarea.value);
-
-      const textoOriginal = btn.innerText;
-      btn.innerText = '✅ Código Copiado com Sucesso!';
-      btn.style.backgroundColor = '#1e7e34';
-
-      setTimeout(() => {
-        btn.innerText = textoOriginal;
-        btn.style.backgroundColor = '#28a745';
-      }, 2500);
-    }
-
-    // Cronômetro
-    function iniciarContagemRegressiva(segundosTotais) {
-      let tempoRestante = segundosTotais;
-      const timerElemento = document.getElementById('timerExpira');
-
-      intervaloTimer = setInterval(() => {
-        const minutos = Math.floor(tempoRestante / 60);
-        const segundos = tempoRestante % 60;
-
-        const minFormatado = minutos < 10 ? '0' + minutos : minutos;
-        const segFormatado = segundos < 10 ? '0' + segundos : segundos;
-
-        if (timerElemento) {
-          timerElemento.innerText = `⏱️ Expira em: ${minFormatado}:${segFormatado}`;
-        }
-
-        if (tempoRestante <= 0) {
-          clearInterval(intervaloTimer);
-          document.getElementById('resultadoPix').innerHTML = '<p style="color: red; text-align: center;">⌛ Este QR Code expirou. Gere outro para pagar.</p>';
-        }
-
-        tempoRestante--;
-      }, 1000);
-    }
-
-    // Lógica do Pix
+    // --- LÓGICA DO PIX ---
     async function gerarPixFixo() {
-      if (intervaloTimer) clearInterval(intervaloTimer);
-      document.getElementById('notificacao').style.display = 'none';
-
       const divResultado = document.getElementById('resultadoPix');
       divResultado.innerHTML = '<p style="text-align: center; color: #666;">Gerando QR Code...</p>';
+      ocultarNotificacao();
 
       try {
         const valor = document.getElementById('valorPix').value;
-        const res = await fetch('http://localhost:3000/api/pix/valor-fixo', {
+        const res = await fetch('/api/pix/valor-fixo', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ valor: valor })
         });
+
         const data = await res.json();
 
         if (data.success) {
           divResultado.innerHTML = `
-            <h4 style="text-align: center; margin-bottom: 5px;">Aponte a câmera ou copie o código:</h4>
-            <img src="data:image/jpeg;base64,${data.qrCodeBase64}" />
-            <textarea id="pixCopiaCola" readonly>${data.copiaECola}</textarea>
-            <button class="btn-copiar" onclick="copiarCodigoPix(this)">📋 Copiar Código Pix</button>
-            <div class="timer" id="timerExpira">⏱️ Expira em: 15:00</div>
+            <img src="data:image/jpeg;base64,${data.qrCodeBase64}" alt="QR Code Pix">
+            <div class="copia-cola-box">${data.copiaECola}</div>
+            <button class="btn-submit" style="background:#28a745;" onclick="copiarPix('${data.copiaECola}')">📋 Copiar Código Pix</button>
           `;
-          iniciarContagemRegressiva(15 * 60);
         } else {
-          divResultado.innerHTML = `<p style="color: red;">Erro: ${data.error}</p>`;
+          divResultado.innerHTML = `<p style="color:red;">Erro: ${data.error}</p>`;
         }
       } catch (err) {
-        divResultado.innerHTML = '<p style="color: red;">Erro ao se conectar ao servidor.</p>';
+        divResultado.innerHTML = `<p style="color:red;">Erro ao se conectar ao servidor.</p>`;
       }
     }
 
-    // Lógica do Cartão
-    document.getElementById('formCartao').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const divResultado = document.getElementById('resultadoCartao');
-      divResultado.innerHTML = '<p style="text-align: center;">Processando cartão...</p>';
+    function copiarPix(codigo) {
+      navigator.clipboard.writeText(codigo);
+      alert('Código Pix copiado para a área de transferência!');
+    }
 
-      const exp = document.getElementById('cardExpirationDate').value.split('/');
+    function exibirNotificacao(mensagem, tipo) {
+      const notif = document.getElementById('notificacao');
+      notif.innerText = mensagem;
+      notif.className = `notificacao ${tipo}`;
+      notif.style.display = 'block';
+    }
 
-      try {
-        const cardToken = await mp.createCardToken({
-          cardNumber: document.getElementById('cardNumber').value.replace(/\s+/g, ''),
-          cardholderName: document.getElementById('cardholderName').value,
-          cardExpirationMonth: exp[0],
-          cardExpirationYear: '20' + exp[1],
-          securityCode: document.getElementById('securityCode').value,
-          identification: {
-            type: 'CPF',
-            number: document.getElementById('docNumber').value.replace(/\D/g, '')
-          }
-        });
-
-        const valor = document.getElementById('valorCartao').value;
-        const email = document.getElementById('email').value;
-        const cpf = document.getElementById('docNumber').value.replace(/\D/g, '');
-
-        const res = await fetch('http://localhost:3000/api/cartao/pagar', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            token: cardToken.id,
-            issuer_id: cardToken.issuer_id,
-            payment_method_id: cardToken.payment_method_id,
-            transaction_amount: valor,
-            installments: 1,
-            email: email,
-            cpf: cpf
-          })
-        });
-
-        const data = await res.json();
-
-        if (data.success && data.status === 'approved') {
-          tocarSomSucesso();
-          divResultado.innerHTML = '<p style="color: green; text-align: center; font-weight: bold;">✅ Cartão Aprovado com Sucesso!</p>';
-        } else {
-          divResultado.innerHTML = `<p style="color: red; text-align: center;">Status: ${data.status || 'Recusado'}. Verifique os dados do cartão.</p>`;
-        }
-
-      } catch (err) {
-        console.error(err);
-        divResultado.innerHTML = '<p style="color: red; text-align: center;">Erro ao processar dados do cartão.</p>';
-      }
-    });
+    function ocultarNotificacao() {
+      document.getElementById('notificacao').style.display = 'none';
+    }
   </script>
 </body>
 </html>
