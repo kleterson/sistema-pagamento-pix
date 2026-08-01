@@ -135,11 +135,14 @@ app.post('/webhook', async (req, res) => {
   res.sendStatus(200);
 });
 
-// 4. HISTÓRICO
-app.get('/api/historico', (req, res) => {
-  db.all(`SELECT * FROM pagamentos ORDER BY data_criacao DESC`, [], (err, rows) => {
-    if (err) res.status(500).json({ success: false, error: err.message });
-    else res.json({ success: true, pagamentos: rows });
+// 4. HISTÓRICO (Ajustado para atender a rota /api/transacoes que o admin.html chama)
+app.get('/api/transacoes', (req, res) => {
+  db.all(`SELECT id, valor, status, metodo, data_criacao as data FROM pagamentos ORDER BY data_criacao DESC`, [], (err, rows) => {
+    if (err) {
+      res.status(500).json({ success: false, error: err.message });
+    } else {
+      res.json({ success: true, transacoes: rows });
+    }
   });
 });
 
