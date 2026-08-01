@@ -17,7 +17,10 @@
     }
 
     body {
-      background-color: #f4f6f9;
+      /* Fundo com Imagem de Tecnologia e Overlay Escuro para dar Contraste */
+      background: linear-gradient(rgba(10, 20, 30, 0.75), rgba(10, 20, 30, 0.85)), 
+                  url('https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1920&q=80') no-repeat center center fixed;
+      background-size: cover;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -26,9 +29,10 @@
     }
 
     .container {
-      background-color: #ffffff;
+      background-color: rgba(255, 255, 255, 0.96);
       border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(8px);
       width: 100%;
       max-width: 480px;
       padding: 30px;
@@ -37,7 +41,7 @@
     h2 {
       text-align: center;
       margin-bottom: 25px;
-      color: #333;
+      color: #1a252f;
     }
 
     .tabs {
@@ -71,7 +75,7 @@
       display: block;
       margin-bottom: 6px;
       font-weight: 600;
-      color: #555;
+      color: #444;
     }
 
     input, select {
@@ -208,17 +212,17 @@
       <form id="formCartao">
         <div class="form-group">
           <label>Número do Cartão:</label>
-          <div id="formCartao-cardNumber" style="height: 45px; border: 1px solid #ccc; border-radius: 6px; padding: 5px;"></div>
+          <div id="formCartao-cardNumber" style="height: 45px; border: 1px solid #ccc; border-radius: 6px; padding: 5px; background: white;"></div>
         </div>
 
         <div class="form-group" style="display: flex; gap: 10px;">
           <div style="flex: 1;">
             <label>Validade:</label>
-            <div id="formCartao-expirationDate" style="height: 45px; border: 1px solid #ccc; border-radius: 6px; padding: 5px;"></div>
+            <div id="formCartao-expirationDate" style="height: 45px; border: 1px solid #ccc; border-radius: 6px; padding: 5px; background: white;"></div>
           </div>
           <div style="flex: 1;">
             <label>CVV:</label>
-            <div id="formCartao-securityCode" style="height: 45px; border: 1px solid #ccc; border-radius: 6px; padding: 5px;"></div>
+            <div id="formCartao-securityCode" style="height: 45px; border: 1px solid #ccc; border-radius: 6px; padding: 5px; background: white;"></div>
           </div>
         </div>
 
@@ -257,7 +261,7 @@
   <script>
     const socket = io("https://sistema-pagamento-pix.onrender.com");
 
-    // RECEBE A NOTIFICAÇÃO DE PAGAMENTO APROVADO (PIX OU CARTÃO VIA SERVER)
+    // RECEBE A NOTIFICAÇÃO DE PAGAMENTO APROVADO
     socket.on('pagamento_confirmado', (data) => {
       exibirTelaSucesso(data.valor);
     });
