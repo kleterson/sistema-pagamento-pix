@@ -91,14 +91,6 @@
       border-color: #009ee3;
     }
 
-    .mp-input-box {
-      height: 45px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      padding: 8px 12px;
-      background-color: #fff;
-    }
-
     .btn-submit {
       width: 100%;
       padding: 14px;
@@ -215,46 +207,43 @@
 
     <!-- ABA CARTÃO -->
     <div id="abaCartao" style="display: none;">
-      <form id="formCartao">
+      <form id="formCartao" onsubmit="pagarComCartao(event)">
         <div class="form-group">
-          <label>Número do Cartão:</label>
-          <div id="formCartao-cardNumber" class="mp-input-box"></div>
+          <label for="cardNumber">Número do Cartão:</label>
+          <input type="text" id="cardNumber" placeholder="0000 0000 0000 0000" maxlength="19" required>
         </div>
 
         <div class="form-group" style="display: flex; gap: 10px;">
           <div style="flex: 1;">
-            <label>Validade:</label>
-            <div id="formCartao-expirationDate" class="mp-input-box"></div>
+            <label for="cardExpiration">Validade:</label>
+            <input type="text" id="cardExpiration" placeholder="MM/AA" maxlength="5" required>
           </div>
           <div style="flex: 1;">
-            <label>CVV:</label>
-            <div id="formCartao-securityCode" class="mp-input-box"></div>
+            <label for="cardCvv">CVV:</label>
+            <input type="password" id="cardCvv" placeholder="123" maxlength="4" required>
           </div>
         </div>
 
         <div class="form-group">
           <label for="cardholderName">Nome no Cartão:</label>
-          <input type="text" id="cardholderName" placeholder="Como está impresso no cartão">
+          <input type="text" id="cardholderName" placeholder="Como está impresso no cartão" required>
         </div>
 
         <div class="form-group">
           <label for="email">E-mail:</label>
-          <input type="email" id="email" placeholder="seu@email.com">
+          <input type="email" id="email" placeholder="seu@email.com" required>
         </div>
 
         <div class="form-group">
           <label for="docNumber">CPF:</label>
-          <input type="text" id="docNumber" placeholder="Somente números">
+          <input type="text" id="docNumber" placeholder="Somente números" required>
         </div>
 
         <div class="form-group">
           <label for="installments">Parcelas:</label>
-          <select id="installments"></select>
-        </div>
-
-        <div class="form-group">
-          <label for="issuer">Banco Emissor:</label>
-          <select id="issuer"></select>
+          <select id="installments">
+            <option value="1">1x de R$ 10,00</option>
+          </select>
         </div>
 
         <button type="submit" class="btn-submit" id="btnPagarCartao">Pagar com Cartão</button>
@@ -266,10 +255,8 @@
 
   <script>
     const socket = io("https://sistema-pagamento-pix.onrender.com");
-    let mpInstance = null;
-    let cardFormInstance = null;
+    const mp = new MercadoPago('APP_USR-70133504-c8c3-4d26-a05d-c6a655dd0e6f', { locale: 'pt-BR' });
 
-    // Recebe notificação de pagamento aprovado via Socket
     socket.on('pagamento_confirmado', (data) => {
       exibirTelaSucesso(data.valor);
     });
@@ -289,6 +276,8 @@
           <div class="sucesso-texto">Recebemos o seu pagamento de <strong>R$ ${valor}</strong> com sucesso.</div>
         </div>
       `;
+      document.getElementById('abaCartao').style.display = 'none';
+      document.getElementById('abaPix').style.display = 'block';
     }
 
     function mostrarAba(aba) {
@@ -307,82 +296,70 @@
         btnPix.classList.remove('active');
         abaCartao.style.display = 'block';
         abaPix.style.display = 'none';
-
-        // Inicializa os campos do Cartão do Mercado Pago
-        inicializarCartaoMercadoPago();
       }
     }
 
-    // Inicializador seguro do Cartão
-    async function inicializarCartaoMercadoPago() {
-      if (cardFormInstance) return; // Evita recarregar se já inicializou
+    // Pagamento com Cartão Direto
+    async function pagarComCartao(event) {
+      event.preventDefault();
+      
+      const btn = document.getElementById('btnPagarCartao');
+      btn.innerText = "Processando...";
+      btn.disabled = true;
+
+      const cardNumber = document.getElementById('cardNumber').value.replace(/\s+/g, '');
+      const [cardExpirationMonth, cardExpirationYearShort] = document.getElementById('cardExpiration').value.split('/');
+      const cardExpirationYear = '20' + (cardExpirationYearShort || '');
+      const securityCode = document.getElementById('cardCvv').value;
+      const cardholderName = document.getElementById('cardholderName').value;
+      const email = document.getElementById('email').value;
+      const identificationNumber = document.getElementById('docNumber').value;
 
       try {
-        // Toca em seu backend para pegar a chave pública se necessário ou usa SDK v2
-        const mp = new MercadoPago('APP_USR-70133504-c8c3-4d26-a05d-c6a655dd0e6f', { locale: 'pt-BR' });
-        
-        cardFormInstance = mp.cardForm({
-          amount: "10.00",
-          iframe: true,
-          form: {
-            id: "formCartao",
-            cardNumber: { id: "formCartao-cardNumber", placeholder: "0000 0000 0000 0000" },
-            expirationDate: { id: "formCartao-expirationDate", placeholder: "MM/AA" },
-            securityCode: { id: "formCartao-securityCode", placeholder: "123" },
-            cardholderName: { id: "cardholderName" },
-            issuer: { id: "issuer" },
-            installments: { id: "installments" },
-            identificationNumber: { id: "docNumber" },
-            cardholderEmail: { id: "email" }
-          },
-          callbacks: {
-            onFormMounted: error => {
-              if (error) return console.warn("Erro ao carregar campos de cartão:", error);
-            },
-            onSubmit: event => {
-              event.preventDefault();
-              const {
-                paymentMethodId: payment_method_id,
-                issuerId: issuer_id,
-                cardholderEmail: email,
-                token,
-                installments,
-                identificationNumber: docNumber
-              } = cardFormInstance.getCardFormData();
-
-              document.getElementById('btnPagarCartao').innerText = "Processando...";
-
-              fetch("https://sistema-pagamento-pix.onrender.com/api/cartao/pagar", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  token,
-                  issuer_id,
-                  payment_method_id,
-                  transaction_amount: 10.00,
-                  installments: Number(installments),
-                  email,
-                  cpf: docNumber
-                })
-              })
-              .then(res => res.json())
-              .then(data => {
-                document.getElementById('btnPagarCartao').innerText = "Pagar com Cartão";
-                if(data.success) {
-                  exibirTelaSucesso("10.00");
-                } else {
-                  alert("Erro no pagamento: " + (data.error || "Dados recusados."));
-                }
-              })
-              .catch(err => {
-                document.getElementById('btnPagarCartao').innerText = "Pagar com Cartão";
-                alert("Erro ao conectar com o servidor.");
-              });
-            }
-          }
+        // Cria o token do cartão de forma segura pelo SDK do Mercado Pago
+        const tokenData = await mp.createCardToken({
+          cardNumber,
+          cardholderName,
+          cardExpirationMonth,
+          cardExpirationYear,
+          securityCode,
+          identificationType: 'CPF',
+          identificationNumber
         });
+
+        if (!tokenData.id) {
+          throw new Error("Não foi possível gerar o token do cartão. Verifique os dados.");
+        }
+
+        // Envia para o backend processar o pagamento
+        const res = await fetch("https://sistema-pagamento-pix.onrender.com/api/cartao/pagar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            token: tokenData.id,
+            payment_method_id: tokenData.payment_method_id || 'visa',
+            issuer_id: tokenData.issuer_id || 1,
+            transaction_amount: 10.00,
+            installments: 1,
+            email,
+            cpf: identificationNumber
+          })
+        });
+
+        const data = await res.json();
+        btn.innerText = "Pagar com Cartão";
+        btn.disabled = false;
+
+        if (data.success) {
+          exibirTelaSucesso("10,00");
+        } else {
+          alert("Pagamento recusado: " + (data.error || "Tente outro cartão."));
+        }
       } catch (err) {
-        console.error("Erro no SDK Mercado Pago:", err);
+        console.error(err);
+        btn.innerText = "Pagar com Cartão";
+        btn.disabled = false;
+        alert("Erro ao processar o cartão. Verifique se os dados estão corretos.");
       }
     }
 
