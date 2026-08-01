@@ -18,7 +18,7 @@ const io = new Server(server, {
 app.use(express.json());
 app.use(cors());
 
-// --- SERVIR ARQUIVOS ESTÁTICOS (HTML, CSS, JS) ---
+// --- SERVIR ARQUIVOS HTML/CSS/JS AUTOMATICAMENTE ---
 app.use(express.static(path.join(__dirname)));
 
 app.get('/', (req, res) => {
@@ -42,7 +42,6 @@ db.run(`
 `);
 
 // --- MERCADO PAGO ---
-// Pega a variável de ambiente do Render ou usa o token diretamente
 const accessToken = process.env.MERCADO_PAGO_TOKEN || 'APP_USR-517824253559090-073117-47dad5ef4352fb0abd9e5d717275dfa3-71867761';
 const client = new MercadoPagoConfig({ accessToken });
 const payment = new Payment(client);
@@ -79,7 +78,7 @@ app.post('/api/pix/valor-fixo', async (req, res) => {
   }
 });
 
-// 2. ROTA: CARTÃO DE CRÉDITO/DÉBITO
+// 2. ROTA CARTÃO
 app.post('/api/cartao/pagar', async (req, res) => {
   try {
     const { token, issuer_id, payment_method_id, transaction_amount, installments, email, cpf } = req.body;
@@ -104,7 +103,6 @@ app.post('/api/cartao/pagar', async (req, res) => {
     const paymentId = String(result.id);
     const status = result.status === 'approved' ? 'APROVADO' : result.status.toUpperCase();
 
-    // Salva no banco de dados
     db.run(`INSERT INTO pagamentos (id, valor, status, metodo) VALUES (?, ?, ?, ?)`, [paymentId, transaction_amount, status, 'CARTAO']);
 
     if (status === 'APROVADO') {
@@ -118,7 +116,7 @@ app.post('/api/cartao/pagar', async (req, res) => {
   }
 });
 
-// 3. WEBHOOK (REPETIÇÃO E NOTIFICAÇÃO DO MERCADO PAGO)
+// 3. WEBHOOK
 app.post('/webhook', async (req, res) => {
   const { type, data } = req.body;
   if (type === 'payment') {
